@@ -1,7 +1,6 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
 local angle = 1
@@ -16,23 +15,42 @@ local partFolder
 local attachment1
 local humanoidRootPart
 local blackHolePart
+local glowPart
 
 local function isPlayerPart(part)
 	return part:IsDescendantOf(LocalPlayer.Character)
 end
 
 local function createEffects(part)
-    -- Glow Effect using ParticleEmitter
-    local glow = Instance.new("ParticleEmitter", part)
-    glow.Texture = "rbxassetid://4941579251"  -- Texture for the particles (choose one you prefer)
-    glow.Rate = 50  -- Rate of particles being emitted
-    glow.Lifetime = NumberRange.new(1, 2)  -- How long each particle lasts
-    glow.Size = NumberSequence.new(2, 5)  -- How the particles grow (start small, get bigger)
-    glow.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))  -- Particle color (white glow)
-    glow.LightEmission = 1  -- How much light the particles emit (1 is fully lit)
-    glow.Speed = NumberRange.new(5, 10)  -- Speed of particles in random directions
-    glow.SpreadAngle = Vector2.new(0, 360)  -- Spread the particles in a circular motion
-    glow.RotSpeed = NumberRange.new(0, 360)  -- Rotation speed of particles
+	-- Small glow part that follows the black hole
+	glowPart = Instance.new("Part")
+	glowPart.Size = part.Size + Vector3.new(0.5, 0.5, 0.5)
+	glowPart.Anchored = true
+	glowPart.CanCollide = false
+	glowPart.Material = Enum.Material.Neon
+	glowPart.Color = Color3.fromRGB(0, 0, 0)
+	glowPart.Transparency = 0.2
+	glowPart.Name = "Glow"
+	glowPart.Parent = partFolder
+
+	-- Follow the black hole's position
+	RunService.RenderStepped:Connect(function()
+		if blackHolePart and glowPart then
+			glowPart.CFrame = blackHolePart.CFrame
+		end
+	end)
+
+	-- Particle effect on the black hole
+	local particle = Instance.new("ParticleEmitter", part)
+	particle.Texture = "rbxassetid://48374994" -- Use your own texture if desired
+	particle.Rate = 10
+	particle.Lifetime = NumberRange.new(1, 1.5)
+	particle.Size = NumberSequence.new(0.5)
+	particle.Transparency = NumberSequence.new(0.1)
+	particle.Color = ColorSequence.new(Color3.new(1, 1, 1))
+	particle.LightEmission = 1
+	particle.Speed = NumberRange.new(0)
+	particle.SpreadAngle = Vector2.new(0, 360)
 end
 
 local function setupAttachment()
@@ -46,7 +64,7 @@ local function setupAttachment()
 	blackHolePart = Instance.new("Part", partFolder)
 	blackHolePart.Anchored = true
 	blackHolePart.CanCollide = false
-	blackHolePart.Transparency = 1 -- Initially hidden
+	blackHolePart.Transparency = 1 -- Hidden initially
 	blackHolePart.Size = Vector3.new(5, 5, 5)
 	blackHolePart.Color = Color3.new(0, 0, 0)
 	blackHolePart.Material = Enum.Material.SmoothPlastic
@@ -84,7 +102,7 @@ end
 
 local function startBlackHole()
 	if not blackHolePart then return end
-	blackHolePart.Transparency = 0 -- Show it
+	blackHolePart.Transparency = 0
 
 	if blackHoleLoop then blackHoleLoop:Disconnect() end
 	blackHoleLoop = RunService.RenderStepped:Connect(function()
@@ -112,7 +130,7 @@ local function stopBlackHole()
 	if blackHoleLoop then blackHoleLoop:Disconnect() blackHoleLoop = nil end
 	if forceConnection then forceConnection:Disconnect() forceConnection = nil end
 	if blackHolePart then
-		blackHolePart.Transparency = 1 -- Hide it
+		blackHolePart.Transparency = 1
 		blackHolePart.CFrame = CFrame.new(0, -1000, 0)
 	end
 end
@@ -136,12 +154,6 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 setupAttachment()
-
--- Optional Bloom for glow
-local bloom = Instance.new("BloomEffect", Lighting)
-bloom.Intensity = 1
-bloom.Threshold = 0
-bloom.Size = 10
 
 -- UI
 local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/miroeramaa/TurtleLib/main/TurtleUiLib.lua"))()
