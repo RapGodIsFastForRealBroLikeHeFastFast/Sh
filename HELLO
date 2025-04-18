@@ -1,13 +1,13 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
 local angle = 1
-local radius = 1
-local angleSpeed = 1
-local orbitResponsiveness = 1
+local radius = 10
+local angleSpeed = 2
+local orbitResponsiveness = 500
+local spinSpeed = 5  -- Controls how fast the parts spin on their own axes
 local blackHoleActive = false
 
 local blackHoleLoop
@@ -15,172 +15,153 @@ local forceConnection
 local partFolder
 local attachment1
 local humanoidRootPart
-local blackHolePart
 
 local function isPlayerPart(part)
-	return part:IsDescendantOf(LocalPlayer.Character)
+    return part:IsDescendantOf(LocalPlayer.Character)
 end
 
 local function createEffects(part)
-	-- Glowing Ring via SurfaceGui (Top)
-	local surfaceGuiTop = Instance.new("SurfaceGui")
-	surfaceGuiTop.Face = Enum.NormalId.Top
-	surfaceGuiTop.AlwaysOnTop = true
-	surfaceGuiTop.LightInfluence = 0
-	surfaceGuiTop.Parent = part
+    -- Glow Ring (3D Mesh)
+    local ring = Instance.new("MeshPart")
+    ring.Shape = Enum.PartType.Cylinder
+    ring.Size = Vector3.new(10, 1, 10)
+    ring.CFrame = part.CFrame
+    ring.Anchored = true
+    ring.CanCollide = false
+    ring.Material = Enum.Material.SmoothPlastic
+    ring.Color = Color3.fromRGB(0, 0, 0)
+    ring.Transparency = 0.3
+    ring.Parent = partFolder
 
-	local ringImageTop = Instance.new("ImageLabel")
-	ringImageTop.BackgroundTransparency = 1
-	ringImageTop.Size = UDim2.new(1, 0, 1, 0)
-	ringImageTop.Image = "rbxassetid://4941579251"
-	ringImageTop.ImageColor3 = Color3.new(1, 1, 1)
-	ringImageTop.ImageTransparency = 0
-	ringImageTop.ScaleType = Enum.ScaleType.Fit
-	ringImageTop.Parent = surfaceGuiTop
-
-	-- Bottom ring
-	local surfaceGuiBottom = surfaceGuiTop:Clone()
-	surfaceGuiBottom.Face = Enum.NormalId.Bottom
-	surfaceGuiBottom.Parent = part
-
-	-- Particle swirl
-	local swirl = Instance.new("ParticleEmitter", part)
-	swirl.Texture = "rbxassetid://243660364"
-	swirl.Rate = 20
-	swirl.Lifetime = NumberRange.new(1)
-	swirl.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 0)})
-	swirl.Speed = NumberRange.new(0)
-	swirl.Rotation = NumberRange.new(0, 360)
-	swirl.RotSpeed = NumberRange.new(50)
-	swirl.Color = ColorSequence.new(Color3.new(1, 1, 1))
-	swirl.LightEmission = 1
-	swirl.ZOffset = 2
+    -- Add glow effect using ParticleEmitter
+    local glow = Instance.new("ParticleEmitter", ring)
+    glow.Texture = "rbxassetid://4941579251"
+    glow.Rate = 50
+    glow.Lifetime = NumberRange.new(1, 2)
+    glow.Size = NumberSequence.new(5)
+    glow.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
 end
 
 local function setupAttachment()
-	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-	humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
-	if partFolder then partFolder:Destroy() end
-	partFolder = Instance.new("Folder", Workspace)
-	partFolder.Name = "BlackHoleFolder"
+    if partFolder then partFolder:Destroy() end
+    partFolder = Instance.new("Folder", Workspace)
+    partFolder.Name = "BlackHoleFolder"
 
-	blackHolePart = Instance.new("Part", partFolder)
-	blackHolePart.Anchored = true
-	blackHolePart.CanCollide = false
-	blackHolePart.Transparency = 1 -- Initially hidden
-	blackHolePart.Size = Vector3.new(5, 5, 5)
-	blackHolePart.Color = Color3.new(0, 0, 0)
-	blackHolePart.Material = Enum.Material.SmoothPlastic
+    local invisiblePart = Instance.new("Part", partFolder)
+    invisiblePart.Anchored = true
+    invisiblePart.CanCollide = false
+    invisiblePart.Transparency = 0
+    invisiblePart.Size = Vector3.new(5, 5, 5)
+    invisiblePart.Color = Color3.new(0, 0, 0)
+    invisiblePart.Material = Enum.Material.SmoothPlastic
 
-	createEffects(blackHolePart)
+    -- Add effects
+    createEffects(invisiblePart)
 
-	attachment1 = Instance.new("Attachment", blackHolePart)
+    attachment1 = Instance.new("Attachment", invisiblePart)
 end
 
 local function ForcePart(v)
-	if v:IsA("Part") and not v.Anchored and not isPlayerPart(v) and not v.Parent:FindFirstChild("Humanoid") and v.Name ~= "Handle" then
-		for _, x in pairs(v:GetChildren()) do
-			if x:IsA("BodyAngularVelocity") or x:IsA("BodyForce") or x:IsA("BodyGyro") or x:IsA("BodyPosition") or x:IsA("BodyThrust") or x:IsA("BodyVelocity") or x:IsA("RocketPropulsion") then
-				x:Destroy()
-			end
-		end
-		if v:FindFirstChild("Attachment") then v.Attachment:Destroy() end
-		if v:FindFirstChild("AlignPosition") then v.AlignPosition:Destroy() end
-		if v:FindFirstChild("Torque") then v.Torque:Destroy() end
+    if v:IsA("Part") and not v.Anchored and not isPlayerPart(v) and not v.Parent:FindFirstChild("Humanoid") and v.Name ~= "Handle" then
+        -- Remove unwanted forces
+        for _, x in pairs(v:GetChildren()) do
+            if x:IsA("BodyAngularVelocity") or x:IsA("BodyForce") or x:IsA("BodyGyro") or x:IsA("BodyPosition") or x:IsA("BodyThrust") or x:IsA("BodyVelocity") or x:IsA("RocketPropulsion") then
+                x:Destroy()
+            end
+        end
 
-		v.CanCollide = false
+        -- Remove unnecessary attachments
+        if v:FindFirstChild("Attachment") then v.Attachment:Destroy() end
+        if v:FindFirstChild("AlignPosition") then v.AlignPosition:Destroy() end
+        if v:FindFirstChild("Torque") then v.Torque:Destroy() end
 
-		local torque = Instance.new("Torque", v)
-		torque.Torque = Vector3.new(1e6, 1e6, 1e6)
-		local alignPos = Instance.new("AlignPosition", v)
-		local attachment2 = Instance.new("Attachment", v)
-		torque.Attachment0 = attachment2
-		alignPos.MaxForce = math.huge
-		alignPos.MaxVelocity = math.huge
-		alignPos.Responsiveness = orbitResponsiveness
-		alignPos.Attachment0 = attachment2
-		alignPos.Attachment1 = attachment1
-	end
+        v.CanCollide = false
+
+        -- Attach the part to a rotating force (this will spin the part on its own axis)
+        local torque = Instance.new("BodyAngularVelocity")
+        torque.MaxTorque = Vector3.new(100000, 100000, 100000)
+        torque.AngularVelocity = Vector3.new(0, spinSpeed, 0)  -- Adjusted to spin around Y axis
+        torque.Parent = v
+
+        -- Align the part to the black hole's center and make it orbit around it
+        local alignPos = Instance.new("AlignPosition", v)
+        local attachment2 = Instance.new("Attachment", v)
+        torque.Attachment0 = attachment2
+        alignPos.MaxForce = math.huge
+        alignPos.MaxVelocity = math.huge
+        alignPos.Responsiveness = orbitResponsiveness
+        alignPos.Attachment0 = attachment2
+        alignPos.Attachment1 = attachment1
+    end
 end
 
 local function startBlackHole()
-	if not blackHolePart then return end
-	blackHolePart.Transparency = 0 -- Show it
+    if blackHoleLoop then blackHoleLoop:Disconnect() end
+    blackHoleLoop = RunService.RenderStepped:Connect(function()
+        if humanoidRootPart and attachment1 then
+            local offsetX = math.cos(angle) * radius
+            local offsetZ = math.sin(angle) * radius
+            attachment1.WorldCFrame = humanoidRootPart.CFrame * CFrame.new(offsetX, 0, offsetZ)
+            angle += math.rad(angleSpeed)
+        end
+    end)
 
-	if blackHoleLoop then blackHoleLoop:Disconnect() end
-	blackHoleLoop = RunService.RenderStepped:Connect(function()
-		if humanoidRootPart and attachment1 then
-			local offsetX = math.cos(angle) * radius
-			local offsetZ = math.sin(angle) * radius
-			local targetCFrame = humanoidRootPart.CFrame * CFrame.new(offsetX, 6, offsetZ)
-			blackHolePart.CFrame = targetCFrame
-			attachment1.WorldCFrame = targetCFrame
-			angle += math.rad(angleSpeed)
-		end
-	end)
+    -- Apply the spinning and force effect to parts in the workspace
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        ForcePart(v)
+    end
 
-	for _, v in ipairs(Workspace:GetDescendants()) do
-		ForcePart(v)
-	end
-
-	if forceConnection then forceConnection:Disconnect() end
-	forceConnection = Workspace.DescendantAdded:Connect(function(v)
-		ForcePart(v)
-	end)
+    if forceConnection then forceConnection:Disconnect() end
+    forceConnection = Workspace.DescendantAdded:Connect(function(v)
+        ForcePart(v)
+    end)
 end
 
 local function stopBlackHole()
-	if blackHoleLoop then blackHoleLoop:Disconnect() blackHoleLoop = nil end
-	if forceConnection then forceConnection:Disconnect() forceConnection = nil end
-	if blackHolePart then
-		blackHolePart.Transparency = 1 -- Hide it
-		blackHolePart.CFrame = CFrame.new(0, -1000, 0)
-	end
+    if blackHoleLoop then blackHoleLoop:Disconnect() blackHoleLoop = nil end
+    if forceConnection then forceConnection:Disconnect() forceConnection = nil end
+    if attachment1 then attachment1.WorldCFrame = CFrame.new(0, -1000, 0) end
 end
 
 local function toggleBlackHole(state)
-	blackHoleActive = state
-	if state then
-		startBlackHole()
-	else
-		stopBlackHole()
-	end
+    blackHoleActive = state
+    if state then
+        startBlackHole()
+    else
+        stopBlackHole()
+    end
 end
 
 -- Re-setup on respawn
 LocalPlayer.CharacterAdded:Connect(function()
-	task.wait(1)
-	setupAttachment()
-	if blackHoleActive then
-		startBlackHole()
-	end
+    task.wait(1)
+    setupAttachment()
+    if blackHoleActive then
+        startBlackHole()
+    end
 end)
 
 setupAttachment()
-
--- Optional Bloom for glow
-local bloom = Instance.new("BloomEffect", Lighting)
-bloom.Intensity = 2
-bloom.Threshold = 0
-bloom.Size = 56
 
 -- UI
 local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/miroeramaa/TurtleLib/main/TurtleUiLib.lua"))()
 local window = library:Window("Projeto LKB")
 
-window:Slider("Radius Blackhole", 1, 100, 1, function(val)
-	radius = val
+window:Slider("Radius Blackhole", 1, 100, 10, function(val)
+    radius = val
 end)
 
-window:Slider("Spin Speed", 1, 1000, 1, function(val)
-	angleSpeed = val
+window:Slider("Spin Speed", 1, 100, 5, function(val)
+    spinSpeed = val
 end)
 
-window:Slider("Orbit Speed", 1, 1000, 1, function(val)
-	orbitResponsiveness = val
+window:Slider("Orbit Speed", 1, 1000, 500, function(val)
+    orbitResponsiveness = val
 end)
 
 window:Toggle("Blackhole", false, function(state)
-	toggleBlackHole(state)
+    toggleBlackHole(state)
 end)
