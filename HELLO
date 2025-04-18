@@ -22,20 +22,8 @@ local function isPlayerPart(part)
 end
 
 local function createEffects(part)
-    -- Glow Ring (3D Mesh)
-    local ring = Instance.new("MeshPart")
-    ring.MeshId = "rbxassetid://60229124"  -- Cylinder mesh (change to your own if needed)
-    ring.Size = Vector3.new(10, 1, 10)  -- Make the ring wider and thin in the Y-axis
-    ring.CFrame = part.CFrame
-    ring.Anchored = true
-    ring.CanCollide = false
-    ring.Material = Enum.Material.SmoothPlastic
-    ring.Color = Color3.fromRGB(0, 0, 0)
-    ring.Transparency = 0.3
-    ring.Parent = partFolder
-
-    -- Add glow effect using ParticleEmitter
-    local glow = Instance.new("ParticleEmitter", ring)
+    -- Glow Effect using ParticleEmitter
+    local glow = Instance.new("ParticleEmitter", part)
     glow.Texture = "rbxassetid://4941579251"  -- Texture for the particles (choose one you prefer)
     glow.Rate = 50  -- Rate of particles being emitted
     glow.Lifetime = NumberRange.new(1, 2)  -- How long each particle lasts
